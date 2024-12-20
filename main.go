@@ -28,6 +28,34 @@ func (board *Board) Init() {
 }
 
 
+func (board *Board) GetPossibleValuesColumn (j int) (map[int][]int) {
+	valuesInColumn := map[int][]int{}
+	for k := 0; k < board.Width; k++ {
+		if board.Content[k][j].Value == 0 && !board.Content[k][j].isBlocked {
+			possibleValues := board.GetPossibleValues(k, j)
+			for key := range possibleValues {
+				valuesInColumn[key] = append(valuesInColumn[key], k)
+			}
+		}
+	}
+	return valuesInColumn
+}
+
+
+func (board *Board) GetPossibleValuesRow (i int) (map[int][]int) {
+	valuesInRow := map[int][]int{}
+	for k := 0; k < board.Width; k++ {
+		if board.Content[i][k].Value == 0 && !board.Content[i][k].isBlocked {
+			possibleValues := board.GetPossibleValues(i, k)
+			for key := range possibleValues {
+				valuesInRow[key] = append(valuesInRow[key], k)
+			}
+		}
+	}
+	return valuesInRow
+}
+
+
 func (board *Board) Print() {
 	fmt.Println("----------------------------")
 	for i := 0; i < board.High; i++ {
@@ -38,14 +66,12 @@ func (board *Board) Print() {
 			}
 			if value == 0 {
 				fmt.Print("-")
+			} else if board.Content[i][j].isBlocked {
+				fmt.Print("\033[35m")
+				fmt.Print(strconv.Itoa(value))
+				fmt.Print("\033[0m")
 			} else {
-				if (board.Content[i][j].isBlocked) {
-					fmt.Print("\033[35m")
-					fmt.Print(strconv.Itoa(value))
-					fmt.Print("\033[0m")
-				} else {
-					fmt.Print(strconv.Itoa(value))
-				}
+				fmt.Print(strconv.Itoa(value))
 			}
 			if (j + 1) % 3 == 0 {
 				fmt.Print("  | ")
@@ -86,17 +112,16 @@ func (board *Board) FillBoard (valuesToFill [][]int) {
 		}
 	}
 }
- 
-func (board *Board) GetValuesInSameSquare (y int, x int) (map[int]struct{}) {
-	init_row := (x / 3) * 3
-	init_column := (y / 3) * 3
+
+
+func (board *Board) GetValuesInSameSquare (i int, j int) (map[int]struct{}) {
+	init_row := (i / 3) * 3
+	init_column := (j / 3) * 3
 	usedValues := map[int]struct{}{}
-	for i := init_row; i < init_row + 3; i++ {
-        for j := init_column; j < init_column + 3; j++ {
-			if _, ok := usedValues[board.Content[i][j].Value]; !ok {
-				if board.Content[i][j].Value != 0 {
-					usedValues[board.Content[i][j].Value] = struct{}{}
-				}
+	for k_i := init_row; k_i < init_row + 3; k_i++ {
+        for k_j := init_column; k_j < init_column + 3; k_j++ {
+			if _, ok := usedValues[board.Content[k_i][k_j].Value]; !ok && board.Content[k_i][k_j].Value != 0 {
+				usedValues[board.Content[k_i][k_j].Value] = struct{}{}
 			}
         }
     }
@@ -104,37 +129,74 @@ func (board *Board) GetValuesInSameSquare (y int, x int) (map[int]struct{}) {
 }
 
 
-func (board *Board) GetPossibleValues(y int, x int) (map[int]struct{}) {
+func (board *Board) GetPossibleValues(i int, j int) (map[int]struct{}) {
 	usedValues := map[int]struct{}{}
 	possibleValues := map[int]struct{}{
 		1: {}, 2: {}, 3: {},
 		4: {}, 5: {}, 6: {},
 		7: {}, 8: {}, 9: {},
 	}
-	for i := 0; i < 9; i++ {
-		if board.Content[x][i].Value != 0 {
-			if _, ok := usedValues[board.Content[x][i].Value]; !ok {
-				usedValues[board.Content[x][i].Value] = struct{}{}
-			}
+	for k := 0; k < 9; k++ {
+		if _, ok := usedValues[board.Content[i][k].Value]; !ok && board.Content[i][k].Value != 0 {
+			usedValues[board.Content[i][k].Value] = struct{}{}
 		}
-		if board.Content[i][y].Value != 0 {
-			if _, ok := usedValues[board.Content[i][y].Value]; !ok {
-				usedValues[board.Content[i][y].Value] = struct{}{}
-			}
+		if _, ok := usedValues[board.Content[k][j].Value]; !ok && board.Content[k][j].Value != 0 {
+			usedValues[board.Content[k][j].Value] = struct{}{}
 		}
 	}
-	inSameSquare := board.GetValuesInSameSquare(y, x)
+	inSameSquare := board.GetValuesInSameSquare(i, j)
 	for key := range inSameSquare {
         usedValues[key] = struct{}{}
     }
-	for key := range usedValues {
-		if _, ok := possibleValues[key]; ok {
-			delete(possibleValues, key)
-		}
-    }
 	delete(usedValues, 0)
+	for key := range usedValues {
+		delete(possibleValues, key)
+    }
 	return possibleValues
 }
+
+
+func (board *Board) FillWithUniqueValues () {
+	for i := 0; i < board.High; i++ {
+		for j := 0; j < board.Width; j++ {
+			if !board.Content[i][j].isBlocked && board.Content[i][j].Value == 0 {
+				possibleValues := board.GetPossibleValues(i, j)
+				if len(possibleValues) == 1 {
+					for key := range possibleValues {
+						_, err := board.SetValue(key, i, j)
+						if err != nil {
+							panic(err)
+						}
+					}
+				}
+			}
+		}
+		rowValues := board.GetPossibleValuesRow(i)
+		for key := range rowValues {
+			if len(rowValues[key]) == 1 {
+				_, err := board.SetValue(key, i, rowValues[key][0])
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+		columnValues := board.GetPossibleValuesColumn(i)
+		for key := range columnValues {
+			if len(columnValues[key]) == 1 {
+				_, err := board.SetValue(key, columnValues[key][0], i)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}
+}
+
+
+func (board *Board) SetWithGuessFiller () {
+
+}
+
 
 func main() {
 
@@ -143,26 +205,14 @@ func main() {
 		Width: 9,
 	}
 	board.Init()
-	
-	valuesToFillBoard := loadboard.GetValuesFromAPI("https://sudoku-api.vercel.app/api/dosuku")
+
+	valuesToFillBoard := loadboard.GetValuesFromAPI("https://sudoku-game-and-api.netlify.app/api/sudoku")
 	board.FillBoard(valuesToFillBoard)
 	board.Print()
-	for k := 0; k < 10; k++ {
-		for i := 0; i < board.High; i++ {
-			for j := 0; j < board.Width; j++ {
-				if !board.Content[i][j].isBlocked && board.Content[i][j].Value == 0 {
-					possibleValues := board.GetPossibleValues(j, i)
-					if len(possibleValues) == 1 {
-						target_value := 0
-						for key := range possibleValues {
-							target_value = key
-							break
-						}
-						board.SetValue(target_value, i, j)
-					}
-				}
-			}
-		}
+
+	for k := 0; k < 5; k++ {
+		board.FillWithUniqueValues()
+
 		fmt.Println("============================")
 		board.Print()
 	}

@@ -2,7 +2,7 @@ package loadboard
 
 import (
     "fmt"
-    "io/ioutil"
+    "io"
     "log"
     "net/http"
     "os"
@@ -10,15 +10,7 @@ import (
 )
 
 type ResponseAPI struct {
-	NewBoard NewBoard `json:"newboard"`
-}
-
-type NewBoard struct {
-	Grids []Grid `json:"grids"`
-}
-
-type Grid struct {
-	Values [][]int `json:"value"`
+    Values [][]int  `json:"medium"`
 }
 
 func GetValuesFromAPI (urlAPI string) (values [][]int) {
@@ -28,7 +20,7 @@ func GetValuesFromAPI (urlAPI string) (values [][]int) {
         fmt.Print(err.Error())
         os.Exit(1)
     }
-    responseData, err := ioutil.ReadAll(response.Body)
+    responseData, err := io.ReadAll(response.Body)
     if err != nil {
         log.Fatal(err)
     }
@@ -39,5 +31,5 @@ func GetValuesFromAPI (urlAPI string) (values [][]int) {
         fmt.Println("Error al parsear el JSON:", err)
         return
     }
-    return sudokuResponse.NewBoard.Grids[0].Values
+    return sudokuResponse.Values
 }
